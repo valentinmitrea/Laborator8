@@ -9,11 +9,15 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import android.app.Fragment;
+import android.app.FragmentManager;
 import android.content.Context;
 import android.util.Log;
 import ro.pub.cs.systems.eim.lab08.chatservicejmdns.general.Constants;
 import ro.pub.cs.systems.eim.lab08.chatservicejmdns.general.Utilities;
 import ro.pub.cs.systems.eim.lab08.chatservicejmdns.model.Message;
+import ro.pub.cs.systems.eim.lab08.chatservicejmdns.view.ChatActivity;
+import ro.pub.cs.systems.eim.lab08.chatservicejmdns.view.ChatConversationFragment;
 
 public class ChatClient {
 
@@ -70,14 +74,13 @@ public class ChatClient {
 
 		@Override
 		public void run() {
-
 			PrintWriter printWriter = Utilities.getWriter(socket);
 			if (printWriter != null) {
 				try {
 					Log.d(Constants.TAG,
 							"Sending messages to " + socket.getInetAddress() + ":" + socket.getLocalPort());
 					
-					// TODO: exercise 6
+					// exercise 6
 					// iterate while the thread is not yet interrupted
 					// - get the content (a line) from the messageQueue, if available, using the take() method
 					// - if the content is not null
@@ -86,7 +89,34 @@ public class ChatClient {
 					//   - add the message to the conversationHistory
 					//   - if the ChatConversationFragment is visible (query the FragmentManager for the Constants.FRAGMENT_TAG tag)
 					//   append the message to the graphic user interface
-				
+					while (!Thread.currentThread().isInterrupted()) {
+						String content = messageQueue.take();
+						if (content == null || content.isEmpty()) {
+							Log.d(Constants.TAG, "Content null or empty message");
+							continue;
+						}
+						
+						printWriter.println(content);
+						printWriter.flush();
+						
+						Message message = new Message(content, Constants.MESSAGE_TYPE_SENT);
+						conversationHistory.add(message);
+						
+						//daca activitatea nu este in prin plan
+						if (context == null)
+							continue;
+						
+						ChatActivity chatActivity = (ChatActivity)context;
+						FragmentManager fragmentManager = chatActivity.getFragmentManager();
+						Fragment fragment = fragmentManager.findFragmentByTag(Constants.FRAGMENT_TAG);
+						
+						if (fragment == null)
+							continue;
+						if (fragment instanceof ChatConversationFragment && fragment.isVisible()) {
+							ChatConversationFragment chatConversationFragment = (ChatConversationFragment)fragment;
+							chatConversationFragment.appendMessage(message);
+						}
+					}
 				} catch (Exception exception) {
 					Log.e(Constants.TAG, "An exception has occurred: " + exception.getMessage());
 					if (Constants.DEBUG) {
@@ -96,7 +126,6 @@ public class ChatClient {
 			}
 
 			Log.i(Constants.TAG, "Send Thread ended");
-
 		}
 
 		public void stopThread() {
@@ -109,14 +138,13 @@ public class ChatClient {
 
 		@Override
 		public void run() {
-
 			BufferedReader bufferedReader = Utilities.getReader(socket);
 			if (bufferedReader != null) {
 				try {
 					Log.d(Constants.TAG,
 							"Reading messages from " + socket.getInetAddress() + ":" + socket.getLocalPort());
 
-					// TODO: exercise 7
+					// exercise 7
 					// iterate while the thread is not yet interrupted
 					// - receive the content (a line) from the bufferedReader, if available
 					// - if the content is not null
@@ -124,7 +152,31 @@ public class ChatClient {
 					//   - add the message to the conversationHistory
 					//   - if the ChatConversationFragment is visible (query the FragmentManager for the Constants.FRAGMENT_TAG tag)
 					//   append the message to the graphic user interface
-
+					while (!Thread.currentThread().isInterrupted()) {
+						String content = bufferedReader.readLine();
+						if (content == null || content.isEmpty()) {
+							Log.d(Constants.TAG, "Content null or empty message");
+							continue;
+						}
+						
+						Message message = new Message(content, Constants.MESSAGE_TYPE_RECEIVED);
+						conversationHistory.add(message);
+						
+						//daca activitatea nu este in prin plan
+						if (context == null)
+							continue;
+						
+						ChatActivity chatActivity = (ChatActivity)context;
+						FragmentManager fragmentManager = chatActivity.getFragmentManager();
+						Fragment fragment = fragmentManager.findFragmentByTag(Constants.FRAGMENT_TAG);
+						
+						if (fragment == null)
+							continue;
+						if (fragment instanceof ChatConversationFragment && fragment.isVisible()) {
+							ChatConversationFragment chatConversationFragment = (ChatConversationFragment)fragment;
+							chatConversationFragment.appendMessage(message);
+						}
+					}
 				} catch (Exception exception) {
 					Log.e(Constants.TAG, "An exception has occurred: " + exception.getMessage());
 					if (Constants.DEBUG) {
@@ -134,7 +186,6 @@ public class ChatClient {
 			}
 
 			Log.i(Constants.TAG, "Receive Thread ended");
-
 		}
 
 		public void stopThread() {
@@ -176,7 +227,6 @@ public class ChatClient {
 	}
 
 	public void stopThreads() {
-
 		sendThread.stopThread();
 		receiveThread.stopThread();
 
